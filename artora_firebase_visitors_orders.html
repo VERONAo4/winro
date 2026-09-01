@@ -1,0 +1,2244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    doc,
+    setDoc,
+    getDocs,
+    query,
+    orderBy,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+  // Replace every value below with the Firebase config from:
+  // Firebase Console → Project settings → Your apps → Web app.
+  const firebaseConfig = {
+    apiKey: "YOUR_FIREBASE_API_KEY",
+    authDomain: "YOUR_FIREBASE_PROJECT.firebaseapp.com",
+    projectId: "YOUR_FIREBASE_PROJECT_ID",
+    storageBucket: "YOUR_FIREBASE_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
+    appId: "YOUR_FIREBASE_APP_ID"
+  };
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  const firebaseAuth = getAuth(firebaseApp);
+  const firestoreDb = getFirestore(firebaseApp);
+  const googleProvider = new GoogleAuthProvider();
+
+  window.artoraFirebase = {
+    app: firebaseApp,
+    auth: firebaseAuth,
+    db: firestoreDb,
+    googleProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged,
+    collection,
+    addDoc,
+    doc,
+    setDoc,
+    getDocs,
+    query,
+    orderBy,
+    serverTimestamp
+  };
+
+  window.dispatchEvent(new Event("artoraFirebaseReady"));
+</script>
+
+
+<title>ARTORA | Poster Store</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:Arial,Helvetica,sans-serif;
+    background:#f5f5f5;
+    color:#111;
+}
+
+header{
+    background:#111;
+    color:#fff;
+    padding:18px 6%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    position:sticky;
+    top:0;
+    z-index:999;
+}
+
+.logo{
+    font-size:27px;
+    font-weight:bold;
+    letter-spacing:4px;
+}
+
+nav{
+    display:flex;
+    gap:20px;
+    flex-wrap:wrap;
+}
+
+nav button{
+    background:none;
+    border:0;
+    color:white;
+    cursor:pointer;
+    font-size:14px;
+}
+
+nav button:hover{
+    opacity:.6;
+}
+
+.hero{
+    min-height:75vh;
+    display:flex;
+    align-items:center;
+    padding:70px 8%;
+    color:white;
+    background:
+    linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,.65)),
+    linear-gradient(135deg,#222,#777);
+}
+
+.hero h1{
+    font-size:clamp(45px,8vw,90px);
+    line-height:.95;
+    margin-bottom:25px;
+}
+
+.hero p{
+    font-size:19px;
+    margin-bottom:30px;
+}
+
+.btn{
+    background:#111;
+    color:#fff;
+    border:0;
+    padding:14px 25px;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+.btn:hover{
+    background:#333;
+}
+
+.section{
+    padding:70px 7%;
+}
+
+.section-title{
+    text-align:center;
+    font-size:40px;
+    margin-bottom:40px;
+}
+
+.categories{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:25px;
+}
+
+.category{
+    background:white;
+    padding:50px 20px;
+    text-align:center;
+    cursor:pointer;
+    border:1px solid #ddd;
+    transition:.2s;
+}
+
+.category:hover{
+    transform:translateY(-5px);
+}
+
+.category h3{
+    font-size:28px;
+    margin-bottom:10px;
+}
+
+.category p{
+    color:#666;
+}
+
+.product-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:25px;
+}
+
+.product{
+    background:#fff;
+    overflow:hidden;
+    transition:.2s;
+}
+
+.product:hover{
+    transform:translateY(-5px);
+}
+
+.product-image{
+    width:100%;
+    height:300px;
+    object-fit:cover;
+    background:#ddd;
+}
+
+.product-info{
+    padding:20px;
+}
+
+.product-info h3{
+    margin-bottom:10px;
+}
+
+.price{
+    font-size:20px;
+    font-weight:bold;
+    margin-bottom:15px;
+}
+
+.product-info button{
+    margin-right:5px;
+    margin-bottom:5px;
+}
+
+.page{
+    display:none;
+}
+
+.page.active{
+    display:block;
+}
+
+.page-header{
+    text-align:center;
+    background:white;
+    padding:70px 20px;
+}
+
+.page-header h1{
+    font-size:55px;
+    margin-bottom:10px;
+}
+
+.detail{
+    max-width:1100px;
+    margin:60px auto;
+    background:white;
+    padding:35px;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:50px;
+}
+
+.detail img{
+    width:100%;
+    max-height:650px;
+    object-fit:contain;
+}
+
+.detail-content{
+    display:flex;
+    justify-content:center;
+    flex-direction:column;
+}
+
+.detail-content h1{
+    font-size:45px;
+    margin-bottom:20px;
+}
+
+.detail-content p{
+    line-height:1.7;
+    margin-bottom:20px;
+}
+
+.owner-login{
+    max-width:450px;
+    margin:70px auto;
+    background:white;
+    padding:40px;
+}
+
+.owner-login h1{
+    margin-bottom:25px;
+    text-align:center;
+}
+
+input,select,textarea{
+    width:100%;
+    padding:14px;
+    margin-bottom:15px;
+    border:1px solid #ccc;
+    font-size:15px;
+}
+
+textarea{
+    min-height:120px;
+    resize:vertical;
+}
+
+.dashboard{
+    max-width:1100px;
+    margin:50px auto;
+    padding:20px;
+}
+
+.admin-box{
+    background:white;
+    padding:30px;
+    margin-bottom:30px;
+}
+
+.admin-box h2{
+    margin-bottom:20px;
+}
+
+.admin-product{
+    display:flex;
+    align-items:center;
+    gap:20px;
+    border-bottom:1px solid #ddd;
+    padding:15px 0;
+}
+
+.admin-product img{
+    width:80px;
+    height:80px;
+    object-fit:cover;
+}
+
+.admin-info{
+    flex:1;
+}
+
+.delete{
+    background:#c00;
+    color:white;
+    border:0;
+    padding:10px 15px;
+    cursor:pointer;
+}
+
+.logout{
+    float:right;
+    background:#c00;
+    color:white;
+    border:0;
+    padding:10px 15px;
+    cursor:pointer;
+}
+
+.message{
+    margin-top:15px;
+    text-align:center;
+}
+
+footer{
+    background:#111;
+    color:white;
+    text-align:center;
+    padding:35px;
+    margin-top:50px;
+}
+
+.empty{
+    text-align:center;
+    padding:50px;
+    background:white;
+}
+
+@media(max-width:900px){
+
+    .product-grid{
+        grid-template-columns:repeat(2,1fr);
+    }
+
+    .categories{
+        grid-template-columns:1fr;
+    }
+
+    .detail{
+        grid-template-columns:1fr;
+        margin:30px 15px;
+    }
+}
+
+@media(max-width:600px){
+
+    header{
+        flex-direction:column;
+        gap:15px;
+    }
+
+    .product-grid{
+        grid-template-columns:1fr;
+    }
+
+    .hero{
+        min-height:65vh;
+    }
+
+    .page-header h1{
+        font-size:40px;
+    }
+
+    .detail-content h1{
+        font-size:35px;
+    }
+
+    nav{
+        justify-content:center;
+    }
+}
+
+.cart-item{
+    background:#fff;
+    display:flex;
+    align-items:center;
+    gap:20px;
+    padding:18px;
+    margin-bottom:15px;
+    border:1px solid #ddd;
+}
+.cart-item img{
+    width:90px;
+    height:90px;
+    object-fit:cover;
+}
+.cart-info{
+    flex:1;
+}
+.cart-info h3{
+    margin-bottom:7px;
+}
+.cart-price{
+    font-weight:bold;
+    font-size:18px;
+}
+.cart-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+}
+.qty-btn{
+    background:#111;
+    color:#fff;
+    border:0;
+    padding:8px 12px;
+    cursor:pointer;
+}
+.remove-cart{
+    background:#c00;
+    color:#fff;
+    border:0;
+    padding:10px 14px;
+    cursor:pointer;
+}
+.cart-summary{
+    background:#fff;
+    padding:25px;
+    border:1px solid #ddd;
+    text-align:right;
+}
+.cart-total{
+    font-size:24px;
+    font-weight:bold;
+    margin-bottom:15px;
+}
+
+</style>
+</head>
+
+
+<body>
+
+
+<!-- ================= HEADER ================= -->
+
+<header>
+
+<div class="logo">
+ARTORA
+</div>
+
+<nav>
+
+<button onclick="showPage('home')">
+Home
+</button>
+
+<button onclick="showCategory('posters')">
+Posters
+</button>
+
+<button onclick="showCategory('drawings')">
+Drawings
+</button>
+
+<button onclick="showCategory('artprints')">
+Art Prints
+</button>
+
+<button onclick="showPage('owner')">
+Owner
+</button>
+
+<button onclick="showCart()">
+Cart (<span id="cartCount">0</span>)
+</button>
+
+<button onclick="showVisitorLogin()">
+Visitor Login
+</button>
+
+</nav>
+
+</header>
+
+
+<!-- ================= HOME ================= -->
+
+<section id="home" class="page active">
+
+<div class="hero">
+
+<div>
+
+<h1>
+ART THAT<br>
+MAKES A<br>
+STATEMENT
+</h1>
+
+<p>
+Premium posters, drawings and art prints.
+</p>
+
+<button
+class="btn"
+onclick="showCategory('posters')">
+
+SHOP NOW
+
+</button>
+
+</div>
+
+</div>
+
+
+<div class="section">
+
+<h2 class="section-title">
+SHOP BY CATEGORY
+</h2>
+
+<div class="categories">
+
+<div
+class="category"
+onclick="showCategory('posters')">
+
+<h3>POSTERS</h3>
+
+<p>
+Explore Posters
+</p>
+
+</div>
+
+
+<div
+class="category"
+onclick="showCategory('drawings')">
+
+<h3>DRAWINGS</h3>
+
+<p>
+Explore Drawings
+</p>
+
+</div>
+
+
+<div
+class="category"
+onclick="showCategory('artprints')">
+
+<h3>ART PRINTS</h3>
+
+<p>
+Explore Art Prints
+</p>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+
+<!-- ================= CATEGORY PAGE ================= -->
+
+<section id="categoryPage" class="page">
+
+<div class="page-header">
+
+<h1 id="categoryTitle">
+PRODUCTS
+</h1>
+
+<p id="categoryDescription">
+Our collection
+</p>
+
+</div>
+
+
+<div class="section">
+
+<div
+id="categoryProducts"
+class="product-grid">
+</div>
+
+</div>
+
+</section>
+
+
+<!-- ================= PRODUCT PAGE ================= -->
+
+<section id="productPage" class="page">
+
+<div
+id="productDetails"
+class="detail">
+</div>
+
+</section>
+
+
+
+<!-- ================= CART PAGE ================= -->
+<section id="cartPage" class="page">
+
+<div class="page-header">
+<h1>YOUR CART</h1>
+<p>Review your selected products</p>
+</div>
+
+<div class="section">
+<div id="cartItems"></div>
+</div>
+
+</section>
+
+
+<!-- ================= VISITOR LOGIN ================= -->
+<section id="visitorLogin" class="page">
+<div class="owner-login">
+<h1>VISITOR LOGIN</h1>
+<p style="text-align:center;color:#666;margin-bottom:20px;">
+Sign in with Google to continue shopping. Your Google name and location permission
+can be used for the order/customer details.
+</p>
+
+<div id="googleSignInButton" style="display:flex;justify-content:center;margin-bottom:15px;"></div>
+
+<p id="visitorMessage" class="message"></p>
+
+<div id="visitorProfile" style="display:none;text-align:center;margin-top:20px;">
+<p><strong>Name:</strong> <span id="visitorName"></span></p>
+<p><strong>Email:</strong> <span id="visitorEmail"></span></p>
+<p style="margin-top:10px;color:#666;font-size:13px;">
+Location is requested only after you allow browser location access.
+</p>
+<button class="btn" style="margin-top:15px;" onclick="requestVisitorLocation()">
+ALLOW LOCATION
+</button>
+<button class="btn" style="margin-top:15px;" onclick="visitorLogout()">
+LOG OUT
+</button>
+</div>
+</div>
+</section>
+
+<!-- ================= OWNER PAGE ================= -->
+
+<section id="owner" class="page">
+
+
+<!-- LOGIN -->
+
+<div
+id="loginBox"
+class="owner-login">
+
+<h1>
+OWNER LOGIN
+</h1>
+
+<input
+type="password"
+id="password"
+placeholder="Enter owner password">
+
+<button
+class="btn"
+style="width:100%"
+onclick="login()">
+
+LOGIN
+
+</button>
+
+<p
+id="loginMessage"
+class="message">
+</p>
+
+</div>
+
+
+<!-- DASHBOARD -->
+
+<div
+id="dashboard"
+class="dashboard"
+style="display:none">
+
+
+<button
+class="logout"
+onclick="logout()">
+
+LOGOUT
+
+</button>
+
+<h1>
+OWNER DASHBOARD
+</h1>
+
+
+<br><br>
+
+
+<!-- ADD PRODUCT -->
+
+<div class="admin-box">
+
+<h2>
+ADD NEW PRODUCT
+</h2>
+
+<input
+id="productName"
+type="text"
+placeholder="Product name">
+
+
+<input
+id="productPrice"
+type="number"
+placeholder="Price in ₹">
+
+
+<input
+id="productImage"
+type="text"
+placeholder="Image URL">
+
+
+<select id="productCategory">
+
+<option value="posters">
+Posters
+</option>
+
+<option value="drawings">
+Drawings
+</option>
+
+<option value="artprints">
+Art Prints
+</option>
+
+</select>
+
+
+<textarea
+id="productDescription"
+placeholder="Product description">
+</textarea>
+
+
+<button
+class="btn"
+onclick="addProduct()">
+
+ADD PRODUCT
+
+</button>
+
+</div>
+
+
+
+<!-- VISITORS / ORDERS -->
+<div class="admin-box">
+<h2>VISITORS & ORDERS</h2>
+<div style="overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;min-width:900px;">
+<thead>
+<tr>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Name</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Email</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Location</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Orders</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Last Visit</th>
+</tr>
+</thead>
+<tbody id="adminVisitors">
+<tr><td colspan="5" style="padding:20px;">Loading...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="admin-box">
+<h2>RECENT ORDERS</h2>
+<div style="overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;min-width:1000px;">
+<thead>
+<tr>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Order ID</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Customer</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Email</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Location</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Items</th>
+<th style="text-align:left;padding:10px;border-bottom:1px solid #ddd;">Total</th>
+</tr>
+</thead>
+<tbody id="adminOrders">
+<tr><td colspan="6" style="padding:20px;">Loading...</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- PRODUCTS -->
+
+<div class="admin-box">
+
+<h2>
+ALL PRODUCTS
+</h2>
+
+<div id="adminProducts">
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+
+<!-- ================= FOOTER ================= -->
+
+<footer>
+
+<p>
+© 2026 ARTORA — All Rights Reserved.
+</p>
+
+</footer>
+
+
+<script>
+
+
+
+/* =========================================
+   FIREBASE VISITOR AUTH + FIRESTORE
+========================================= */
+
+let artoraFirebaseReady = false;
+
+window.addEventListener("artoraFirebaseReady", () => {
+    artoraFirebaseReady = true;
+    setupFirebaseAuthListener();
+    renderVisitor();
+});
+
+function firebaseReady(){
+    return artoraFirebaseReady &&
+           window.artoraFirebase &&
+           window.artoraFirebase.auth &&
+           window.artoraFirebase.db;
+}
+
+function getVisitor(){
+    try{
+        return JSON.parse(localStorage.getItem("artoraVisitor")) || null;
+    }catch(e){
+        return null;
+    }
+}
+
+function saveVisitor(visitor){
+    localStorage.setItem("artoraVisitor", JSON.stringify(visitor));
+}
+
+function clearVisitor(){
+    localStorage.removeItem("artoraVisitor");
+}
+
+async function setupFirebaseAuthListener(){
+    if(!firebaseReady()) return;
+
+    window.artoraFirebase.onAuthStateChanged(
+        window.artoraFirebase.auth,
+        async (user) => {
+            if(user){
+                const existing = getVisitor() || {};
+                const visitor = {
+                    uid: user.uid,
+                    name: user.displayName || existing.name || "",
+                    email: user.email || existing.email || "",
+                    photoURL: user.photoURL || "",
+                    location: existing.location || "",
+                    locationAccuracy: existing.locationAccuracy || "",
+                    loggedInAt: existing.loggedInAt || new Date().toISOString()
+                };
+                saveVisitor(visitor);
+                await saveVisitorToFirestore(visitor);
+            }else{
+                clearVisitor();
+            }
+            renderVisitor();
+        }
+    );
+}
+
+async function signInVisitorWithGoogle(){
+    if(!firebaseReady()){
+        alert("Firebase is still loading. Please try again.");
+        return;
+    }
+
+    try{
+        const result = await window.artoraFirebase.signInWithPopup(
+            window.artoraFirebase.auth,
+            window.artoraFirebase.googleProvider
+        );
+
+        const user = result.user;
+        const visitor = {
+            uid: user.uid,
+            name: user.displayName || "",
+            email: user.email || "",
+            photoURL: user.photoURL || "",
+            location: (getVisitor() || {}).location || "",
+            locationAccuracy: (getVisitor() || {}).locationAccuracy || "",
+            loggedInAt: new Date().toISOString()
+        };
+
+        saveVisitor(visitor);
+        await saveVisitorToFirestore(visitor);
+        renderVisitor();
+    }catch(error){
+        console.error(error);
+        alert("Google sign-in failed: " + (error.message || "Unknown error"));
+    }
+}
+
+async function saveVisitorToFirestore(visitor){
+    if(!firebaseReady() || !visitor || !visitor.uid) return;
+
+    try{
+        await window.artoraFirebase.setDoc(
+            window.artoraFirebase.doc(
+                window.artoraFirebase.db,
+                "visitors",
+                visitor.uid
+            ),
+            {
+                uid: visitor.uid,
+                name: visitor.name || "",
+                email: visitor.email || "",
+                photoURL: visitor.photoURL || "",
+                location: visitor.location || "",
+                locationAccuracy: visitor.locationAccuracy || "",
+                lastVisitAt: window.artoraFirebase.serverTimestamp()
+            },
+            {merge:true}
+        );
+    }catch(error){
+        console.error("Could not save visitor:", error);
+    }
+}
+
+async function requestVisitorLocation(){
+    if(!navigator.geolocation){
+        alert("Location is not supported by this browser.");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        async function(position){
+            const visitor = getVisitor() || {};
+
+            visitor.location =
+                position.coords.latitude.toFixed(6) + ", " +
+                position.coords.longitude.toFixed(6);
+
+            visitor.locationAccuracy =
+                Math.round(position.coords.accuracy) + " meters";
+
+            saveVisitor(visitor);
+            await saveVisitorToFirestore(visitor);
+            renderVisitor();
+
+            alert("Location saved.");
+        },
+        function(error){
+            let message = "Location permission was not granted.";
+            if(error.code === 1) message = "Please allow location access in your browser.";
+            if(error.code === 2) message = "Your location could not be determined.";
+            if(error.code === 3) message = "Location request timed out.";
+            alert(message);
+        },
+        {enableHighAccuracy:false, timeout:10000, maximumAge:300000}
+    );
+}
+
+function renderVisitor(){
+    const profile = document.getElementById("visitorProfile");
+    if(!profile) return;
+
+    const visitor = getVisitor();
+
+    if(visitor){
+        document.getElementById("visitorName").innerText =
+            visitor.name || "Not available";
+
+        document.getElementById("visitorEmail").innerText =
+            visitor.email || "Not available";
+
+        profile.style.display = "block";
+
+        document.getElementById("visitorMessage").innerText =
+            "Google account connected.";
+
+        document.getElementById("visitorMessage").style.color = "green";
+
+        const button = document.getElementById("googleSignInButton");
+        if(button) button.innerHTML = "";
+    }else{
+        profile.style.display = "none";
+
+        const message = document.getElementById("visitorMessage");
+        if(message){
+            message.innerText = firebaseReady()
+                ? "Sign in with Google to continue."
+                : "Connecting to Firebase...";
+            message.style.color = "#666";
+        }
+
+        const button = document.getElementById("googleSignInButton");
+        if(button && firebaseReady()){
+            button.innerHTML =
+                '<button class="btn" onclick="signInVisitorWithGoogle()">SIGN IN WITH GOOGLE</button>';
+        }
+    }
+}
+
+async function visitorLogout(){
+    try{
+        if(firebaseReady()){
+            await window.artoraFirebase.signOut(window.artoraFirebase.auth);
+        }
+    }catch(error){
+        console.error(error);
+    }
+
+    clearVisitor();
+    renderVisitor();
+}
+
+function showVisitorLogin(){
+    showPage("visitorLogin");
+    renderVisitor();
+}
+
+async function saveOrderToFirestore(order){
+    if(!firebaseReady() || !order) return false;
+
+    try{
+        await window.artoraFirebase.addDoc(
+            window.artoraFirebase.collection(
+                window.artoraFirebase.db,
+                "orders"
+            ),
+            order
+        );
+        return true;
+    }catch(error){
+        console.error("Could not save order:", error);
+        return false;
+    }
+}
+
+async function loadVisitorAndOrderDashboard(){
+    if(!firebaseReady()) return;
+
+    const visitorsBody = document.getElementById("adminVisitors");
+    const ordersBody = document.getElementById("adminOrders");
+
+    try{
+        const visitorSnap = await window.artoraFirebase.getDocs(
+            window.artoraFirebase.collection(
+                window.artoraFirebase.db,
+                "visitors"
+            )
+        );
+
+        const visitors = visitorSnap.docs.map(d => d.data());
+
+        visitorsBody.innerHTML = visitors.length
+            ? visitors.map(v => `
+                <tr>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${escapeHTML(v.name || "—")}
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${escapeHTML(v.email || "—")}
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${escapeHTML(v.location || "Not provided")}
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        —
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${v.lastVisitAt && v.lastVisitAt.toDate
+                            ? v.lastVisitAt.toDate().toLocaleString()
+                            : "—"}
+                    </td>
+                </tr>
+            `).join("")
+            : '<tr><td colspan="5" style="padding:20px;">No visitors yet.</td></tr>';
+
+        const orderSnap = await window.artoraFirebase.getDocs(
+            window.artoraFirebase.query(
+                window.artoraFirebase.collection(
+                    window.artoraFirebase.db,
+                    "orders"
+                ),
+                window.artoraFirebase.orderBy("createdAt", "desc")
+            )
+        );
+
+        const orders = orderSnap.docs.map(d => ({
+            id:d.id,
+            ...d.data()
+        }));
+
+        ordersBody.innerHTML = orders.length
+            ? orders.map(o => `
+                <tr>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${escapeHTML(o.orderId || o.id)}
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${escapeHTML(o.customerName || "—")}
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${escapeHTML(o.customerEmail || "—")}
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${escapeHTML(o.customerLocation || "Not provided")}
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ${escapeHTML(
+                            (o.items || []).map(i =>
+                                `${i.name} × ${i.quantity}`
+                            ).join(", ")
+                        )}
+                    </td>
+                    <td style="padding:10px;border-bottom:1px solid #eee;">
+                        ₹${Number(o.total || 0)}
+                    </td>
+                </tr>
+            `).join("")
+            : '<tr><td colspan="6" style="padding:20px;">No orders yet.</td></tr>';
+
+    }catch(error){
+        console.error("Dashboard Firebase error:", error);
+        visitorsBody.innerHTML =
+            '<tr><td colspan="5" style="padding:20px;color:red;">Could not load visitors. Check Firebase configuration and Firestore rules.</td></tr>';
+        ordersBody.innerHTML =
+            '<tr><td colspan="6" style="padding:20px;color:red;">Could not load orders. Check Firebase configuration and Firestore rules.</td></tr>';
+    }
+}
+
+/* =========================================
+   OWNER PASSWORD
+========================================= */
+
+const OWNER_PASSWORD = "ARTORA@2026";
+
+
+/* =========================================
+   DEFAULT PRODUCTS
+========================================= */
+
+const defaultProducts = [
+
+{
+id:"poster-1",
+
+name:"Abstract Vision",
+
+price:499,
+
+category:"posters",
+
+image:"https://images.unsplash.com/photo-1549490349-8643362247b5?auto=format&fit=crop&w=800&q=80",
+
+description:
+"Premium abstract poster designed for modern interiors."
+},
+
+
+{
+id:"poster-2",
+
+name:"Urban Dreams",
+
+price:599,
+
+category:"posters",
+
+image:"https://images.unsplash.com/photo-1541961017774-22349e4a1262?auto=format&fit=crop&w=800&q=80",
+
+description:
+"Stylish urban artwork for contemporary spaces."
+},
+
+
+{
+id:"drawing-1",
+
+name:"Classic Sketch",
+
+price:699,
+
+category:"drawings",
+
+image:"https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&w=800&q=80",
+
+description:
+"A beautiful classic sketch artwork."
+},
+
+
+{
+id:"drawing-2",
+
+name:"Portrait Sketch",
+
+price:749,
+
+category:"drawings",
+
+image:"https://images.unsplash.com/photo-1577083288073-40892c0860a4?auto=format&fit=crop&w=800&q=80",
+
+description:
+"Minimal portrait drawing for art lovers."
+},
+
+
+{
+id:"print-1",
+
+name:"Modern Art",
+
+price:799,
+
+category:"artprints",
+
+image:"https://images.unsplash.com/photo-1561214115-f2f134cc4912?auto=format&fit=crop&w=800&q=80",
+
+description:
+"Premium modern art print."
+},
+
+
+{
+id:"print-2",
+
+name:"Color Expression",
+
+price:899,
+
+category:"artprints",
+
+image:"https://images.unsplash.com/photo-1579783901586-d88db74b4fe4?auto=format&fit=crop&w=800&q=80",
+
+description:
+"Colorful art print designed for modern rooms."
+}
+
+];
+
+
+/* =========================================
+   GET PRODUCTS
+========================================= */
+
+function getProducts(){
+
+let saved =
+localStorage.getItem("artoraProducts");
+
+if(!saved){
+
+localStorage.setItem(
+"artoraProducts",
+JSON.stringify(defaultProducts)
+);
+
+return defaultProducts;
+
+}
+
+return JSON.parse(saved);
+
+}
+
+
+/* =========================================
+   SAVE PRODUCTS
+========================================= */
+
+function saveProducts(products){
+
+localStorage.setItem(
+"artoraProducts",
+JSON.stringify(products)
+);
+
+}
+
+
+/* =========================================
+   SHOW PAGE
+========================================= */
+
+function showPage(page){
+
+document
+.querySelectorAll(".page")
+.forEach(p=>{
+p.classList.remove("active");
+});
+
+
+document
+.getElementById(page)
+.classList.add("active");
+
+
+window.scrollTo({
+top:0,
+behavior:"smooth"
+});
+
+}
+
+
+/* =========================================
+   CATEGORY
+========================================= */
+
+function showCategory(category){
+
+showPage("categoryPage");
+
+
+let title="";
+
+let description="";
+
+
+if(category==="posters"){
+
+title="POSTERS";
+
+description=
+"Premium posters for your space.";
+
+}
+
+
+if(category==="drawings"){
+
+title="DRAWINGS";
+
+description=
+"Creative drawings and sketches.";
+
+}
+
+
+if(category==="artprints"){
+
+title="ART PRINTS";
+
+description=
+"Premium art prints for your walls.";
+
+}
+
+
+document
+.getElementById("categoryTitle")
+.innerText=title;
+
+
+document
+.getElementById("categoryDescription")
+.innerText=description;
+
+
+displayProducts(category);
+
+}
+
+
+/* =========================================
+   DISPLAY PRODUCTS
+========================================= */
+
+function displayProducts(category){
+
+const container =
+document.getElementById(
+"categoryProducts"
+);
+
+const products =
+getProducts().filter(
+p=>p.category===category
+);
+
+
+container.innerHTML="";
+
+
+if(products.length===0){
+
+container.innerHTML=
+`
+<div class="empty">
+<h2>No products available.</h2>
+</div>
+`;
+
+return;
+
+}
+
+
+products.forEach(product=>{
+
+const card =
+document.createElement("div");
+
+card.className="product";
+
+
+card.innerHTML=`
+
+<img
+class="product-image"
+src="${product.image}"
+alt="${product.name}"
+onerror="this.src='https://via.placeholder.com/800x800?text=ARTORA'"
+>
+
+
+<div class="product-info">
+
+<h3>
+${escapeHTML(product.name)}
+</h3>
+
+<p class="price">
+₹${product.price}
+</p>
+
+<button
+class="btn"
+onclick="viewProduct('${product.id}')">
+
+VIEW PRODUCT
+
+</button>
+
+<button
+class="btn"
+onclick="addToCart('${product.id}')">
+
+ADD TO CART
+
+</button>
+
+</div>
+
+`;
+
+
+container.appendChild(card);
+
+});
+
+}
+
+
+/* =========================================
+   VIEW PRODUCT
+========================================= */
+
+function viewProduct(id){
+
+const product =
+getProducts().find(
+p=>p.id===id
+);
+
+
+if(!product){
+
+alert("Product not found.");
+
+return;
+
+}
+
+
+showPage("productPage");
+
+
+const container =
+document.getElementById(
+"productDetails"
+);
+
+
+container.innerHTML=`
+
+<img
+src="${product.image}"
+alt="${product.name}"
+onerror="this.src='https://via.placeholder.com/800x800?text=ARTORA'"
+>
+
+
+<div class="detail-content">
+
+<h1>
+${escapeHTML(product.name)}
+</h1>
+
+<div class="price">
+₹${product.price}
+</div>
+
+<p>
+${escapeHTML(product.description)}
+</p>
+
+<p>
+Category:
+<strong>
+${categoryName(product.category)}
+</strong>
+</p>
+
+<button
+class="btn"
+onclick="addToCart('${product.id}')">
+
+ADD TO CART
+
+</button>
+
+<br>
+
+<button
+class="btn"
+onclick="showCategory('${product.category}')">
+
+BACK TO CATEGORY
+
+</button>
+
+</div>
+
+`;
+
+}
+
+
+/* =========================================
+   CATEGORY NAME
+========================================= */
+
+function categoryName(category){
+
+if(category==="posters")
+return "Posters";
+
+if(category==="drawings")
+return "Drawings";
+
+if(category==="artprints")
+return "Art Prints";
+
+return category;
+
+}
+
+
+/* =========================================
+   CART
+========================================= */
+
+function getCart(){
+    return JSON.parse(localStorage.getItem("artoraCart")) || [];
+}
+
+function saveCart(cart){
+    localStorage.setItem("artoraCart", JSON.stringify(cart));
+    updateCartCount();
+}
+
+function addToCart(id){
+    const cart = getCart();
+    const existing = cart.find(item => item.id === id);
+
+    if(existing){
+        existing.quantity += 1;
+    }else{
+        cart.push({id:id, quantity:1});
+    }
+
+    saveCart(cart);
+    alert("Product added to cart!");
+}
+
+function updateCartCount(){
+    const cart = getCart();
+    const count = cart.reduce((total,item) => total + Number(item.quantity || 1), 0);
+    const el = document.getElementById("cartCount");
+    if(el) el.innerText = count;
+}
+
+function showCart(){
+    showPage("cartPage");
+    displayCart();
+}
+
+function changeCartQuantity(id, amount){
+    const cart = getCart();
+    const item = cart.find(item => item.id === id);
+    if(!item) return;
+
+    item.quantity += amount;
+
+    if(item.quantity <= 0){
+        const index = cart.findIndex(item => item.id === id);
+        cart.splice(index, 1);
+    }
+
+    saveCart(cart);
+    displayCart();
+}
+
+function removeFromCart(id){
+    const cart = getCart().filter(item => item.id !== id);
+    saveCart(cart);
+    displayCart();
+}
+
+function clearCart(){
+    if(!getCart().length) return;
+    if(confirm("Clear all products from your cart?")){
+        saveCart([]);
+        displayCart();
+    }
+}
+
+function displayCart(){
+    const container = document.getElementById("cartItems");
+    if(!container) return;
+
+    const products = getProducts();
+    const cart = getCart();
+
+    if(cart.length === 0){
+        container.innerHTML = `
+        <div class="empty">
+            <h2>Your cart is empty.</h2>
+            <br>
+            <button class="btn" onclick="showCategory('posters')">START SHOPPING</button>
+        </div>`;
+        return;
+    }
+
+    let total = 0;
+
+    container.innerHTML = cart.map(item => {
+        const product = products.find(p => p.id === item.id);
+        if(!product) return "";
+
+        const quantity = Number(item.quantity || 1);
+        const subtotal = product.price * quantity;
+        total += subtotal;
+
+        return `
+        <div class="cart-item">
+            <img src="${product.image}" alt="${escapeHTML(product.name)}"
+                 onerror="this.src='https://via.placeholder.com/100?text=ARTORA'">
+
+            <div class="cart-info">
+                <h3>${escapeHTML(product.name)}</h3>
+                <p class="cart-price">₹${product.price} each</p>
+            </div>
+
+            <div class="cart-actions">
+                <button class="qty-btn" onclick="changeCartQuantity('${product.id}',-1)">−</button>
+                <strong>${quantity}</strong>
+                <button class="qty-btn" onclick="changeCartQuantity('${product.id}',1)">+</button>
+                <button class="remove-cart" onclick="removeFromCart('${product.id}')">REMOVE</button>
+            </div>
+
+            <strong>₹${subtotal}</strong>
+        </div>`;
+    }).join("");
+
+    container.innerHTML += `
+    <div class="cart-summary">
+        <div class="cart-total">Total: ₹${total}</div>
+        <button class="btn" onclick="clearCart()">CLEAR CART</button>
+        <button class="btn" onclick="placeOrder()">PLACE ORDER</button>
+    </div>`;
+}
+
+
+/* =========================================
+   PLACE ORDER - EMAIL TO OWNER
+========================================= */
+
+async function placeOrder(){
+    const products = getProducts();
+    const cart = getCart();
+
+    if(cart.length === 0){
+        alert("Your cart is empty.");
+        return;
+    }
+
+    const visitor = getVisitor();
+
+    if(!visitor){
+        alert("Please sign in with Google before placing your order.");
+        showVisitorLogin();
+        return;
+    }
+
+    let total = 0;
+    let orderLines = [];
+    let orderItems = [];
+
+    cart.forEach(item => {
+        const product = products.find(p => p.id === item.id);
+        if(!product) return;
+
+        const quantity = Number(item.quantity || 1);
+        const subtotal = Number(product.price) * quantity;
+        total += subtotal;
+
+        orderLines.push(
+            product.name +
+            " | Quantity: " + quantity +
+            " | Price: ₹" + product.price +
+            " | Subtotal: ₹" + subtotal
+        );
+
+        orderItems.push({
+            productId: product.id,
+            name: product.name,
+            price: Number(product.price),
+            quantity: quantity,
+            subtotal: subtotal
+        });
+    });
+
+    const orderId = "ARTORA-" + Date.now();
+    const orderDate = new Date();
+
+    const firestoreOrder = {
+        orderId: orderId,
+        visitorUid: visitor.uid || "",
+        customerName: visitor.name || "",
+        customerEmail: visitor.email || "",
+        customerLocation: visitor.location || "",
+        locationAccuracy: visitor.locationAccuracy || "",
+        items: orderItems,
+        total: total,
+        status: "new",
+        createdAt: window.artoraFirebase
+            ? window.artoraFirebase.serverTimestamp()
+            : orderDate.toISOString()
+    };
+
+    const saved = await saveOrderToFirestore(firestoreOrder);
+
+    if(!saved){
+        alert("The order could not be saved to the Firebase database. Please check your Firebase setup and try again.");
+        return;
+    }
+
+    const message =
+        "NEW ARTORA ORDER\n\n" +
+        "Order ID: " + orderId + "\n" +
+        "Order Date: " + orderDate.toLocaleString() + "\n" +
+        "Customer Name: " + (visitor.name || "Not available") + "\n" +
+        "Customer Google Email: " + (visitor.email || "Not available") + "\n" +
+        "Customer Location: " + (visitor.location || "Not provided") + "\n\n" +
+        "ORDER ITEMS:\n" +
+        orderLines.join("\n") +
+        "\n\nTOTAL: ₹" + total +
+        "\n\nSaved in Firebase Firestore.";
+
+    const recipient = "mr4smilebusiness@gmail.com";
+    const subject = "New ARTORA Order - " + orderId;
+
+    window.location.href =
+        "mailto:" + encodeURIComponent(recipient) +
+        "?subject=" + encodeURIComponent(subject) +
+        "&body=" + encodeURIComponent(message);
+}
+
+
+/* =========================================
+   OWNER LOGIN
+========================================= */
+
+function login(){
+
+const password =
+document.getElementById(
+"password"
+).value;
+
+
+const message =
+document.getElementById(
+"loginMessage"
+);
+
+
+if(password===OWNER_PASSWORD){
+
+sessionStorage.setItem(
+"artoraOwner",
+"true"
+);
+
+
+showDashboard();
+
+
+}else{
+
+message.innerText=
+"Incorrect password.";
+
+message.style.color="red";
+
+}
+
+}
+
+
+/* =========================================
+   SHOW DASHBOARD
+========================================= */
+
+function showDashboard(){
+
+document
+.getElementById("loginBox")
+.style.display="none";
+
+
+document
+.getElementById("dashboard")
+.style.display="block";
+
+
+displayAdminProducts();
+loadVisitorAndOrderDashboard();
+
+}
+
+
+/* =========================================
+   LOGOUT
+========================================= */
+
+function logout(){
+
+sessionStorage.removeItem(
+"artoraOwner"
+);
+
+
+location.reload();
+
+}
+
+
+/* =========================================
+   CHECK LOGIN
+========================================= */
+
+function checkLogin(){
+
+if(
+sessionStorage.getItem(
+"artoraOwner"
+)==="true"
+){
+
+showDashboard();
+
+}
+
+}
+
+
+/* =========================================
+   ADD PRODUCT
+========================================= */
+
+function addProduct(){
+
+const name =
+document
+.getElementById("productName")
+.value
+.trim();
+
+
+const price =
+document
+.getElementById("productPrice")
+.value;
+
+
+const image =
+document
+.getElementById("productImage")
+.value
+.trim();
+
+
+const category =
+document
+.getElementById("productCategory")
+.value;
+
+
+const description =
+document
+.getElementById("productDescription")
+.value
+.trim();
+
+
+if(
+!name ||
+!price ||
+!image ||
+!description
+){
+
+alert(
+"Please fill in all fields."
+);
+
+return;
+
+}
+
+
+const products =
+getProducts();
+
+
+const product={
+
+id:
+"product-"+Date.now(),
+
+name:name,
+
+price:Number(price),
+
+image:image,
+
+category:category,
+
+description:description
+
+};
+
+
+products.push(product);
+
+
+saveProducts(products);
+
+
+alert(
+"Product added successfully!"
+);
+
+
+document
+.getElementById("productName")
+.value="";
+
+
+document
+.getElementById("productPrice")
+.value="";
+
+
+document
+.getElementById("productImage")
+.value="";
+
+
+document
+.getElementById("productDescription")
+.value="";
+
+
+displayAdminProducts();
+
+}
+
+
+/* =========================================
+   ADMIN PRODUCTS
+========================================= */
+
+function displayAdminProducts(){
+
+const container =
+document.getElementById(
+"adminProducts"
+);
+
+
+const products =
+getProducts();
+
+
+container.innerHTML="";
+
+
+if(products.length===0){
+
+container.innerHTML=
+"<p>No products.</p>";
+
+return;
+
+}
+
+
+products.forEach(product=>{
+
+const row =
+document.createElement("div");
+
+row.className=
+"admin-product";
+
+
+row.innerHTML=`
+
+<img
+src="${product.image}"
+onerror="this.src='https://via.placeholder.com/100?text=ARTORA'"
+>
+
+
+<div class="admin-info">
+
+<strong>
+${escapeHTML(product.name)}
+</strong>
+
+<p>
+₹${product.price}
+</p>
+
+<small>
+${categoryName(product.category)}
+</small>
+
+</div>
+
+
+<button
+class="delete"
+onclick="deleteProduct('${product.id}')">
+
+REMOVE
+
+</button>
+
+`;
+
+
+container.appendChild(row);
+
+});
+
+}
+
+
+/* =========================================
+   DELETE PRODUCT
+========================================= */
+
+function deleteProduct(id){
+
+const product =
+getProducts().find(
+p=>p.id===id
+);
+
+
+if(!product)
+return;
+
+
+const confirmed =
+confirm(
+"Remove " +
+product.name +
+"?"
+);
+
+
+if(!confirmed)
+return;
+
+
+let products =
+getProducts();
+
+
+products =
+products.filter(
+p=>p.id!==id
+);
+
+
+saveProducts(products);
+
+
+displayAdminProducts();
+
+
+alert(
+"Product removed."
+);
+
+}
+
+
+/* =========================================
+   ESCAPE HTML
+========================================= */
+
+function escapeHTML(text){
+
+return String(text)
+.replace(/&/g,"&amp;")
+.replace(/</g,"&lt;")
+.replace(/>/g,"&gt;")
+.replace(/"/g,"&quot;")
+.replace(/'/g,"&#039;");
+
+}
+
+
+/* =========================================
+   START WEBSITE
+========================================= */
+
+checkLogin();
+updateCartCount();
+renderVisitor();
+
+</script>
+
+</body>
+</html>
